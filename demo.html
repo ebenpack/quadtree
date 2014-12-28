@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+    <head></head>
+    <body>
+        <div class="main">
+            <div class="canvaswrapper" style="position:relative; width: 600px; height: 400px">
+                <canvas id="qtree" height="400" width="600" style="position:absolute; top: 0; left: 0;"></canvas>
+                <canvas id="quadcanvas" height="400" width="600" style="position: absolute; top: 0; left: 0;"></canvas>
+                <canvas id="collisioncanvas" height="400" width="600" style="position: absolute; top: 0; left: 0;"></canvas>
+            </div>
+            <div id="controls" style="margin-top: 20px;">
+                <button id="add-ball">Add ball</button>
+                <label for="overlay">Draw overlay</label><input type="checkbox" checked="true" name="overlay" id="overlay" />
+            </div>
+            <div id="stats"></div>
+        </div>
+        <script src="build/quad.js"></script>
+        <script>
+        (function() {
+
+            /*
+             * INITIALIZE
+             */
+
+            var canvas = document.getElementById("quadcanvas");
+            var width = canvas.width;
+            var height = canvas.height;
+            object_list = [];
+            animationId = null;
+            overlay = true;
+            randInt = function(max, min){
+                return Math.floor(Math.random() * (max - min) + min);
+            };
+            randSign = function(){
+                return Math.random() < 0.5 ? -1 : 1;
+            };
+            function Ball(pos, vel, rad) {
+                this.x = pos.x;
+                this.y = pos.y;
+                this.velx = vel.x;
+                this.vely = vel.y;
+                // Store position/velocity for next step, but
+                // keep old position/velocity in case they're needed
+                // for other collisions.
+                this.newx = pos.x;
+                this.newy = pos.y;
+                this.newvelx = vel.x;
+                this.newvely = vel.y;
+                this.radius = rad;
+                this.collide = false;
+                this.height = rad * 2;
+                this.width = rad * 2;
+            }
+            Ball.prototype.calculate_new_values = function(){
+                if (this.x + this.velx + this.radius > width || this.x + this.velx - this.radius < 0){
+                    this.newvelx *= -1;
+                }
+                if (this.y + this.vely + this.radius > height || this.y + this.vely - this.radius < 0){
+                    this.newvely *= -1;
+                }
+                this.newx += this.newvelx;
+                this.newy += this.newvely;
+            };
+            Ball.prototype.update = function(){
+                this.x = this.newx;
+                this.y = this.newy;
+                this.velx = this.newvelx;
+                this.vely = this.newvely;
+            };
+            Ball.prototype.bounce = function(ball){
+                var v1 = Math.sqrt(Math.pow(this.velx, 2) + Math.pow(this.vely, 2));
+                var v2 = Math.sqrt(Math.pow(ball.velx, 2) + Math.pow(ball.vely, 2));
+                var dx = ball.x - this.x;
+                var dy = ball.y - this.y;
+                var movement_angle1 = Math.atan2(this.vely, this.velx);
+                var movement_angle2 = Math.atan2(ball.vely, ball.velx);
+                var contact_angle = Math.atan2(dy, dx);
+                this.newvelx = ((2 * v2 * Math.cos(movement_angle2 - contact_angle))/2) * (Math.cos(contact_angle) + v1 * Math.sin(movement_angle1 - contact_angle) * Math.cos(contact_angle + (Math.PI / 2)));
+                this.newvelx = ((2 * v2 * Math.cos(movement_angle2 - contact_angle))/2) * (Math.sin(contact_angle) + v1 * Math.sin(movement_angle1 - contact_angle) * Math.sin(contact_angle + (Math.PI / 2)));
+            };
+            Ball.prototype.detect_collide = function(ball){
+                return (Math.pow(ball.x - this.x, 2) + Math.pow(this.y - ball.y, 2) <= 
+                        Math.pow(this.radius + ball.radius, 2));
+            };
+
+            /*
+             * DRAW
+             */
+
+            // requestAnimationFrame polyfill, courtesy of
+            // http://www.paulirish.com/2011/requestanimationframe-for-smart-animating/
+            var lastTime = 0;
+            var vendors = ['webkit', 'moz'];
+            for(var x = 0; x < vendors.length && !window.requestAnimationFrame; ++x) {
+                window.requestAnimationFrame = window[vendors[x]+'RequestAnimationFrame'];
+                window.cancelAnimationFrame =
+                  window[vendors[x]+'CancelAnimationFrame'] || window[vendors[x]+'CancelRequestAnimationFrame'];
+            }
+
+            if (!window.requestAnimationFrame)
+                window.requestAnimationFrame = function(callback, element) {
+                    var currTime = new Date().getTime();
+                    var timeToCall = Math.max(0, 16 - (currTime - lastTime));
+                    var id = window.setTimeout(function() { callback(currTime + timeToCall); },
+                      timeToCall);
+                    lastTime = currTime + timeToCall;
+                    return id;
+                };
+
+            if (!window.cancelAnimationFrame)
+                window.cancelAnimationFrame = function(id) {
+                    clearTimeout(id);
+                };
+
+            var ctx;
+            var qctx;
+            var quadcanvas = document.getElementById("qtree");
+            var stats = document.getElementById("stats");
+            // Initialize
+            if (canvas.getContext) {
+                ctx = canvas.getContext('2d');
+                qctx = quadcanvas.getContext('2d');
+            } else {
+                // ABORT!
+            }
+
+            qctx.fillStyle = "rgba(0,0,255,0.05)";
+            qctx.strokeStyle = "black";
+
+            // TODO: Optimize draw functions
+            function drawBall(ball){
+                if (ball.collide){
+                    ctx.strokeStyle = "blue";
+                    ctx.fillStyle = "rgba(255,0,0,0.1)";
+                }
+                else {
+                    ctx.strokeStyle = "black";
+                    ctx.fillStyle = "rgba(255,255,255,0.1)";
+                }
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.radius, 0, 2*Math.PI);
+                ctx.fill();
+                ctx.stroke();
+                ctx.closePath();
+            }
+            
+            function recursive_draw_quad(qtree){
+                for (var i = 0; i < qtree.nodes.length; i++){
+                    recursive_draw_quad(qtree.nodes[i]);
+                }
+                var qs = qtree.bounds;
+                qctx.beginPath();
+                qctx.rect(qs.x, qs.y, qs.width, qs.height);
+                qctx.fill();
+                qctx.stroke();
+                qctx.closePath();
+            }
+
+            function draw_quad(){
+                qctx.clearRect(0,0, width, height);
+                if (overlay) {
+                    recursive_draw_quad(qtree);
+                }
+            }
+
+            function draw_balls(){
+                ctx.clearRect(0,0, width, height);
+                for (var i = 0; i < object_list.length; i++){
+                    ball = object_list[i];
+                    drawBall(ball);
+                }
+            }
+
+            function draw_stats(){
+                var ball_count = object_list.length;
+                stats.innerHTML = "Collision Checks: ~" + Math.round(avg_collision_check);
+                stats.innerHTML += "<br>Naive checks: " + ball_count * ball_count;
+                stats.innerHTML += "<br>Balls: " + ball_count;
+            }
+
+            function draw(){
+                draw_balls();
+                draw_quad();
+                draw_stats();
+            }
+
+            /*
+             * EVENTS
+             */
+
+            var randInt = randInt;
+            var randSign = randSign;
+            var Ball = Ball;
+            function addBall(){
+                // Add object with random velocity to random position in canvas.
+                // TODO: check to make sure object isn't already occupying tthat space
+                var mv = randInt(2,5); // Max velocity
+                var radius = randInt(8,13);
+                var position = {x: randInt(20+radius, width-20-radius), y: randInt(20+radius, height-20-radius)};
+                var velocity = {x: randSign(randInt(1,mv)), y: randSign(randInt(1,mv))};
+                object_list.push(new Ball(position, velocity, radius));
+            }
+            function toggleOverlay(e){
+                overlay = this.checked;
+            }
+            // Register events
+            var add = document.getElementById('add-ball');
+            add.addEventListener('click', addBall, false);
+            var overlay = document.getElementById("overlay");
+            overlay.addEventListener('click', toggleOverlay, false);
+
+            /*
+             * MAIN
+             */
+            
+            var qtree = new Quadtree.Quadtree(0, new Quadtree.Bounds(0, 0, width, height));
+            avg_collision_check = 0;
+            function mainLoop(){
+                qtree.clear();
+                var ball;
+                for (var b = 0; b < object_list.length; b++){
+                    ball = object_list[b];
+                    qtree.insert(ball);
+                    ball.calculate_new_values();
+                    ball.collide = false;
+                }
+                // Detect collisions
+                var collision_checks = 0;
+                for (var c = 0; c < object_list.length; c++){
+                    ball = object_list[c];
+                    var possible_collides = qtree.retrieve(ball);
+                    for (var i = 0; i < possible_collides.length; i++){
+                        collision_checks += 1;
+                        var ball2 = possible_collides[i];
+                        if (ball !== ball2 && ball.detect_collide(ball2)){
+                            ball.collide = true;
+                        }
+                    }
+                    avg_collision_check = collision_checks;
+                }
+                for (var e = 0; e < object_list.length; e++){
+                    object_list[e].update();
+                }
+                draw();
+                animationId = requestAnimationFrame(mainLoop);
+            }
+            function init(){
+                mainLoop();
+            }
+
+            init();
+
+        })();
+        </script>
+    </body>
+</html>

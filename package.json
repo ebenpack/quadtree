@@ -1,0 +1,20 @@
+{
+  "name": "quadtree",
+  "version": "0.0.1",
+  "description": "Collision detection using quadtree.",
+  "main": "src/quad.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ebenpack/quadtree.git"
+  },
+  "author": "Eben Packwood",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ebenpack/quadtree/issues"
+  },
+  "homepage": "https://github.com/ebenpack/quadtree",
+  "devDependencies": {
+    "gulp": "^3.8.10",
+    "gulp-browserify": "^0.5.0"
+  }
+}
