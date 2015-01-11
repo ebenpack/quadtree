@@ -1,12 +1,9 @@
-function Bounds(x, y, width, height){
+function Quadtree(level, x, y, width, height) {
+    this.level = level;
     this.x = x;
     this.y = y;
     this.width = width;
     this.height = height;
-}
-function Quadtree(level, bounds) {
-    this.level = level;
-    this.bounds = bounds;
     this.objects = [];
     this.nodes = [];
 }
@@ -20,19 +17,19 @@ Quadtree.prototype.clear = function(){
     this.nodes.length = 0;
 };
 Quadtree.prototype.split = function(){
-    var subWidth = Math.round(this.bounds.width / 2);
-    var subHeight = Math.round(this.bounds.height / 2);
-    var x = Math.round(this.bounds.x);
-    var y = Math.round(this.bounds.y);
-    this.nodes[0] = new Quadtree(this.level+1, new Bounds(x + subWidth, y, subWidth, subHeight));
-    this.nodes[1] = new Quadtree(this.level+1, new Bounds(x, y, subWidth, subHeight));
-    this.nodes[2] = new Quadtree(this.level+1, new Bounds(x, y + subHeight, subWidth, subHeight));
-    this.nodes[3] = new Quadtree(this.level+1, new Bounds(x + subWidth, y + subHeight, subWidth, subHeight));
+    var subWidth = Math.round(this.width / 2);
+    var subHeight = Math.round(this.height / 2);
+    var x = Math.round(this.x);
+    var y = Math.round(this.y);
+    this.nodes[0] = new Quadtree(this.level+1, x + subWidth, y, subWidth, subHeight);
+    this.nodes[1] = new Quadtree(this.level+1, x, y, subWidth, subHeight);
+    this.nodes[2] = new Quadtree(this.level+1, x, y + subHeight, subWidth, subHeight);
+    this.nodes[3] = new Quadtree(this.level+1, x + subWidth, y + subHeight, subWidth, subHeight);
 };
 Quadtree.prototype.getIndex = function(rect){
     var index = -1;
-    var verticalMidpoint = this.bounds.x + (this.bounds.width / 2);
-    var horizontalMidpoint = this.bounds.y + (this.bounds.height / 2);
+    var verticalMidpoint = this.x + (this.width / 2);
+    var horizontalMidpoint = this.y + (this.height / 2);
 
     var topQuadrant = (rect.y < horizontalMidpoint && rect.y + rect.height < horizontalMidpoint);
     var bottomQuadrant = (rect.y > horizontalMidpoint);
@@ -93,4 +90,3 @@ Quadtree.prototype.insert = function(rect){
 };
 
 module.exports.Quadtree = Quadtree;
-module.exports.Bounds = Bounds;

@@ -148,9 +148,8 @@
                 for (var i = 0; i < qtree.nodes.length; i++){
                     recursive_draw_quad(qtree.nodes[i]);
                 }
-                var qs = qtree.bounds;
                 qctx.beginPath();
-                qctx.rect(qs.x, qs.y, qs.width, qs.height);
+                qctx.rect(qtree.x, qtree.y, qtree.width, qtree.height);
                 qctx.fill();
                 qctx.stroke();
                 qctx.closePath();
@@ -213,7 +212,7 @@
              * MAIN
              */
             
-            var qtree = new Quadtree.Quadtree(0, new Quadtree.Bounds(0, 0, width, height));
+            var qtree = new Quadtree.Quadtree(0, 0, 0, width, height);
             avg_collision_check = 0;
             function mainLoop(){
                 qtree.clear();
